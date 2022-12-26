@@ -15,6 +15,10 @@ def words(s, sep=None):
         pass  # TODO: Need to make a usecase
 
 
+def grid(s):
+    return [list(x) for x in s.split("\n")]
+
+
 def lines(s):
     return [l for l in s.split("\n")]
 

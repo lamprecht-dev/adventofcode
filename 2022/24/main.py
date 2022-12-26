@@ -1,116 +1,90 @@
 import collections as coll
-import datetime as dt
-import itertools as it
-import math
-from operator import itemgetter as ig
-import pprint as pp
-import re
-# import bisect
-# import heapq
-# import sys
-# sys.setrecursionlimit(1000000)
 
 from utils import *
 
-
-def get_bliz_pos(b, t, w, h):
-    if b[2] == ">":
-        p = b[0], b[1] + t
-    elif b[2] == "<":
-        p = b[0], b[1] - t
-    elif b[2] == "^":
-        p = b[0] - t, b[1]
-    else:
-        p = b[0] + t, b[1]
-
-    while p[0] < 1:
-        p = (p[0] + (h - 2)), p[1]
-    while p[0] >= h - 1:
-        p = (p[0] - (h - 2)), p[1]
-    while p[1] < 1:
-        p = p[0], (p[1] + (w - 2))
-    while p[1] >= w - 1:
-        p = p[0], (p[1] - (w - 2))
-    return p
-
-
-def get_blitz_pos_all(B, t, DP, w, h):
-    t = t % (w * h)
-    if t not in DP:
-        DP[t] = set()
-        for b in B:
-            DP[t].add(get_bliz_pos(b, t, w, h))
-
-    return DP
-
-
 def solve(d):
-    stats(d)
-    print("Input: ", repr(d))
-
-    ll = lines(d)
-    w = len(ll[0])
-    h = len(ll)
-
-    entrance = ()
-    exit = ()
-    B = []
-    DP = {}
-
-    for row in range(len(ll)):
-        for col in range(len(ll[row])):
-            if row == 0 and ll[row][col] == ".":
-                entrance = (row, col)
-            elif row == h - 1 and ll[row][col] == ".":
-                exit = (row, col)
-
-            if h > row > 0 and w > col > 0:
-                if ll[row][col] not in  [".", "#"]:
-                    B.append((row, col, ll[row][col]))
-
-    for t in range(w * h + 2):
-        print(t, w, h, w*h)
-        DP = get_blitz_pos_all(B, t, DP, w, h)
-
-    # 3D BFS where the z axis is time
-    next = [(*entrance, 0)]
-    his = {(*entrance, 0): []}
-    done = []
-    # Priorotized by the ones that actually get us closer
-    dirs = {"d": (1, 0, 1), "r": (0, 1, 1), "n": (0, 0, 1), "l": (0, -1, 1), 'u': (-1, 0, 1)}
-
-
     t = 0
-    while len(next) > 0:
-        c = next.pop(0)
-        print(c)
-        row, col, t = c
 
-        if (row, col) == exit:
-            break  # Done
+    dirs = {"<": (0, -1), ">": (0, 1), "v": (1, 0), "^": (-1, 0), "@": (0, 0)}
+    G, h, w = grid(d)
+    B = []
+    p1 = ()
+    p2 = ()
 
-        BPos = DP[t + 1]
+    for row in range(h):
+        for col in range(w):
+            if G[row][col] != "." and 0 < row < h - 1 and 0 < col < w - 1:
+                b = [row, col, dirs[G[row][col]]]
+                B.append(b)
+            if row == 0 and G[row][col] == ".":
+                p1 = (row, col)
+            elif row == h - 1 and G[row][col] == ".":
+                p2 = (row, col)
 
-        for _, d in dirs.items():
-            nt = t + d[2]
-            n_pos = (row + d[0], col + d[1], nt)
+    # To simplify future calcs
+    h -= 2
+    w -= 2
 
-            if n_pos in done or n_pos in next:
+    # Update Blizzards
+    def next_B():
+        for b in B:
+            row, col, (row_d, col_d) = b
+            y = row + row_d
+            x = col + col_d
+            y = ((y - 1) % h) + 1
+            x = ((x - 1) % w) + 1
+            b[0] = y
+            b[1] = x
+
+    def get_B_set():
+        Bset = set()
+        for b in B:
+            by, bx, _ = b
+            Bset.add((by, bx))
+        return Bset
+
+    BC = get_B_set()
+    nxt = coll.deque()
+    nxt.append((p1, 0, False, False)) # Coord, Time, Seen End, Seen Start
+    max_time = -1
+    seen = set()
+
+    # Because of some reason I couldn't get it to work on my previous attempt.
+    # I feel like the approach was super similar but it was WAY slower and had some kind of error in it.
+    # So I got some inspiration by nthistle.
+    while True:
+        (cy, cx), time, se, ss = nxt.popleft()
+        if (cy, cx) == p2 and se and ss:  # Found the goal!
+            t2 = time
+            break
+
+        # Keep track of current storms
+        if time > max_time:
+            max_time = time
+            next_B()
+            BC = get_B_set()
+
+        for _,d in dirs.items():
+            dy, dx = d
+            ny = cy + dy
+            nx = cx + dx
+            n = ((ny, nx), time + 1, se, ss)
+
+            # If out of bounds or in storm or already seen, discard
+            if (ny, nx) in BC or n in seen or ((not (0 < ny <= h) or not (0 < nx <= w)) and (ny, nx) != p1 and (ny, nx) != p2):
                 continue
+            seen.add(n)
 
-            if not(0 < n_pos[0] < h and 0 < n_pos[1] < w) and not (*entrance, nt) == n_pos and not (*exit, nt) == n_pos:
-                continue  # Wall but entrance and exit is allowed
+            if (ny, nx) == p2 and not se:
+                n = ((ny, nx), time + 1, True, ss)
+                if t == 0:
+                    t = time + 1
+            elif (ny, nx) == p1 and se:
+                n = ((ny, nx), time + 1, se, True)
 
-            if (n_pos[0], n_pos[1]) in BPos:
-                continue  # Blizzard at that time
+            nxt.append(n)
 
-            his[n_pos] = his[c] + [c]
-
-            next.append(n_pos)
-
-        done.append(c)
-
-    return t, 0
+    return t, t2
 
 
 def main():
@@ -129,7 +103,7 @@ def test():
 #<^v^^>#
 ######.#"""
     a1 = 18
-    a2 = 0
+    a2 = 54
     validate_solution(solve(s), (a1, a2))
 
 

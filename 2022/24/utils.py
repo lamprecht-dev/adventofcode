@@ -12,7 +12,12 @@ def words(s, sep=None):
     if isinstance(s, str):
         return [[x for x in l.split(sep)] for l in s.split("\n")]
     else:
-        pass  # TODO: Need to make a usecase
+        pass
+
+
+def grid(s):
+    G = [list(x) for x in s.split("\n")]
+    return G, len(G), len(G[0])
 
 
 def lines(s):
