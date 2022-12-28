@@ -1,5 +1,6 @@
 import collections as coll
 import datetime as dt
+import functools
 import itertools as it
 import math
 from operator import itemgetter as ig
@@ -13,85 +14,94 @@ from utils import *
 
 def get_neighbors(valve, valves):
     neighbors = []
-    for n in valve[2]:
+    for n in valve[1]:
         neighbors.append(valves[n])
 
     return neighbors
 
 
-def find_best_path(c, his, V, P, DP, lim, players_left=0, default_c=None, default_lim=None):
-    if default_c is None:
-        default_c = c
-    if default_lim is None:
-        default_lim = lim
-    best_value = 0
+def sum_valves(d):
+    return sum([x for (_, x, _) in d])
 
-    hk = his_to_key(his)
-    if hk not in DP[players_left]:
-        DP[players_left][hk] = {}
-    if c[0] not in DP[players_left][hk]:
-        DP[players_left][hk][c[0]] = {}
-    if lim in DP[players_left][hk][c[0]]:
-        return DP[players_left][hk][c[0]][lim], DP
-    else:
-        DP[players_left][hk][c[0]][lim] = 0
 
-    if lim <= 1:
-        return 0, DP
+@functools.lru_cache(maxsize=None)
+def highest_release(cur, opened, lim, pleft=0, dcur=None, dlim=None):
+    global V, Paths
 
-    for vv in V:
-        v = V[vv]
+    if dcur is None:
+        dcur = cur
+    if dlim is None:
+        dlim = lim
 
-        if v is c or v in his or v[1] == 0:
+    new_opened = tuple(sorted(opened + (cur, )))  # Sorted
+    # new_opened = tuple(list(opened) + [cur])  # Not Sorted
+
+    my_release = V[cur][0] * lim
+    if lim <= 1:  # Not enough time to go anywhere and open something (which takes 2 minutes)
+        if pleft > 0:  # If we still have the elephant let him do the rest in his full time
+            return highest_release(dcur, new_opened, dlim, pleft - 1)
+        return [(cur, 0, lim)]
+
+    max_val = []
+    for v in V:
+        if v[0] == 0:  # No flow rate, just skip
             continue
 
-        walk = P[c[0]][v[0]]
+        vi = V.index(v)
+        if vi in opened or vi == cur:  # It's already opened or its self
+            continue
 
-        val, DP = find_best_path(v, his + [c], V, P, DP, lim - walk - 1, players_left, default_c, default_lim)
-        best_value = max(best_value, val)
+        walk = Paths[cur][vi] + 1  # 1min to open the valve
+        val = highest_release(vi, new_opened, lim - walk, pleft, dcur, dlim)
+        val_sum = sum_valves(val)
+        max_val_sum = sum_valves(max_val)
+        if val_sum > max_val_sum:
+            max_val = val
 
-    if players_left > 0:
-        val, DP = find_best_path(default_c, his + [c], V, P, DP, default_lim)
-        best_value = max(val, best_value)
+    # Instead of just one person doing everything,
+    # I could also check what if I had stopped here and the elephant did the rest of the valves?
+    if pleft > 0:
+        val = highest_release(dcur, new_opened, dlim, pleft - 1)
+        val_sum = sum_valves(val)
+        max_val_sum = sum_valves(max_val)
+        if val_sum > max_val_sum:
+            max_val = val
 
-    my_val = c[1] * lim
+    return max_val + [(cur, my_release, lim)]
 
-    DP[players_left][hk][c[0]][lim] = best_value + my_val
-
-    return best_value + my_val, DP
-
-
-def his_to_key(his):
-    key = set()
-    for h in his:
-        key.add(h[0])
-    key = sorted(list(key))
-    key = "".join(key)
-
-    return key
 
 # target, current, V
 def shortest_walk(t, c, V):
-    queue = []
-    visited = []
+    if t is c:
+        return 0
+    queue = coll.deque()
+    visited = set()
 
     nn = get_neighbors(c, V)
     for n in nn:
-        queue.append((n[0], 1))
+        queue.append((V.index(n), 1))
 
     while len(queue) > 0:
-        q = queue.pop(0)
-        if q[0] == t[0]:
+        q = queue.popleft()
+        if q[0] == V.index(t):
             return q[1]
 
         nn = get_neighbors(V[q[0]], V)
         for n in nn:
-            if n in visited:
+            if V.index(n) in visited:
                 continue
 
-            queue.append((n[0], q[1] + 1))
+            already_in_queue = False
+            for q2 in queue:
+                if q2[0] == V.index(n):
+                    already_in_queue = True
+                    break
+            if already_in_queue:
+                continue
 
-        visited.append(V[q[0]])
+            queue.append((V.index(n), q[1] + 1))
+
+        visited.add(q[0])
 
     return 0
 
@@ -100,40 +110,58 @@ def generate_lookup(V):
     paths = {}
 
     for v1 in V:
+        if Valve_Index[V.index(v1)] != "AA" and v1[0] == 0:
+            continue
         ts = {}
         for v2 in V:
-            ts[v2] = shortest_walk(V[v2], V[v1], V)
-        paths[v1] = ts
+            if Valve_Index[V.index(v2)] != "AA" and v2[0] == 0:
+                continue
+            ts[V.index(v2)] = shortest_walk(v2, v1, V)
+        paths[V.index(v1)] = ts
 
     return paths
 
 
+V = []
+Valve_Index = []
+Paths = {}
+
+
 def solve(d):
-    # stats(d)
-    # print("Input: ", repr(d))
-    t = 0
-    t2 = 0
-
-    V = dict()
-
+    global Paths, Valve_Index, V
     ll = lines(d)
+    V = []
+    Valve_Index = []
+
     for l in ll:
         ww = l.split(';')
         leads = ww[1].strip('tunnels lead to ').strip('tunnel leads to ').strip("valves ").strip("valve ").split(", ")
         valve = ww[0].split()[1], int(ww[0].split()[4].strip("rate=")), leads
-        V[ww[0].split()[1]] = valve
+        Valve_Index.append(valve[0])
+        V.append(valve)
 
-    paths = generate_lookup(V)
+    for v in V:
+        no = []
+        i = Valve_Index.index(v[0])
+        for o in v[2]:
+            no.append(Valve_Index.index(o))
+        v = v[1], no
+        V[i] = v
 
-    t = find_best_path(V['AA'], [], V, paths, {1: {}, 0: {}}, 30)[0]
-    t2 = find_best_path(V['AA'], [], V, paths, {1: {}, 0: {}}, 26, 1)[0]
+    Paths = generate_lookup(V)
+    print(Paths)
 
-    return t, t2
+    highest_release.cache_clear()
+    t = highest_release(Valve_Index.index('AA'), (), 30)
+    t2 = highest_release(Valve_Index.index('AA'), (), 26, 1)
+
+    print(sum_valves(t2), t2)
+    return sum_valves(t), sum_valves(t2)
 
 
 def main():
     test()
-    solutions = solve(inp())
+    solutions = solve(inp())    # 1488
     print("\n\n" + BColors.HEADER + "Solutions" + BColors.ENDC)
     for s in solutions:
         print(s)
