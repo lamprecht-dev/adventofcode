@@ -1,138 +1,119 @@
-import collections as coll
-import copy
-import datetime as dt
-import itertools as it
-import math
-from operator import itemgetter as ig
-import pprint as pp
-import re
-# import bisect
-# import heapq
+import functools
+# import sys
+# sys.setrecursionlimit(1000000000)
 
 from utils import *
 
 
-def time_until_build(target, costs, robots, resources):
-    ore = 0
-    clay = 0
-    obsidian = 0
-    if target == "o":
-        if robots['o'] == 0:
-            return -1
-        ore = math.ceil((costs["o"] - resources["o"]) / robots['o'])
-    if target == "c":
-        if robots['o'] == 0:
-            return -1
-        ore = math.ceil((costs["c"] - resources["o"]) / robots['o'])
-    if target == "ob":
-        if robots['o'] == 0 or robots['c'] == 0:
-            return -1
-        ore = math.ceil((costs["ob_o"] - resources["o"]) / robots['o'])
-        clay = math.ceil((costs["ob_c"] - resources["c"]) / robots['c'])
-    if target == "g":
-        if robots['o'] == 0 or robots['ob'] == 0:
-            return -1
-        ore = math.ceil((costs["g_o"] - resources["o"]) / robots['o'])
-        obsidian = math.ceil((costs["g_ob"] - resources["ob"]) / robots['ob'])
+def get_inventory(costs, inventory, robots, adjust):
+    n_inv = []
+    for i in range(len(robots)):
+        n_val = inventory[i] + robots[i] + adjust[i]
+        # We don't need an overflow of materials. We can just keep deleting the overflow, like lets say 3x the max cost
+        if i == ORE:
+            max_ore_cost = max(costs[ORE], costs[CLAY], costs[OB_ORE], costs[GEO_ORE]) * 3
+            n_val = min(max_ore_cost, n_val)
+        if i == CLAY:
+            max_ore_cost = costs[OB_CLAY] * 3
+            n_val = min(max_ore_cost, n_val)
+        if i == OBSIDIAN:
+            max_ore_cost = costs[GEO_OB] * 3
+            n_val = min(max_ore_cost, n_val)
 
-    return max(ore, obsidian, clay) + 1
+        n_inv.append(n_val)
+    return tuple(n_inv)
 
 
-def collect_in_time(time, robots, resources):
-    return {"o": robots["o"] * time + resources['o'], "ob": robots['ob'] * time + resources['ob'],
-            "c": robots['c'] * time + resources['c'], "g": robots['g'] * time + resources['g']}
-
-
-def use_resources(target, costs, resources):
-    c = 0
-    ob = 0
-
-    if target == "o":
-        o = costs["o"]
-    elif target == "c":
-        o = costs['c']
-    elif target == "ob":
-        o = costs['ob_o']
-        c = costs['ob_c']
-    else:
-        o = costs['g_o']
-        ob = costs['g_ob']
-
-    return {'o': resources['o'] - o, "c": resources['c'] - c, "ob": resources['ob'] - ob, "g": resources['g']}
-
-
-def to_index(resources, robots, time):
-    index = [resources['o'], resources['c'], resources['ob'], resources['g'],
-             robots['o'], robots['c'], robots['ob'], robots['g'], time]
-    return index
-
-
-# TODO: Theoretically we could build two robots at a time?
-# TODO: ALSO VERY SLOW. Dynamic Programming?
-# TODO: Other optimizations?
-def most_geodes(costs, robots, time, resources, DP):
-    options = ["o", "ob", "c", "g"]
-    for dp in DP:
-        if dp[0] == to_index(resources, robots, time):
-            return dp[1], DP
+@functools.lru_cache(maxsize=None)
+def most_geodes(costs, time, inventory=None, robots=None):
+    if inventory is None:
+        inventory = (0, 0, 0, 0)
+    if robots is None:
+        robots = (1, 0, 0, 0)
 
     if time <= 1:
-        geodes = collect_in_time(time, robots, resources)['g']
-        dp = (to_index(resources, robots, time), geodes)
-        DP.append(dp)
-        return geodes, DP
+        return inventory[GEODE] + robots[GEODE] * time
 
-    most = 0
-    for o in options:
-        t = time_until_build(o, costs, robots, resources)
-        if t == -1 or t > time:
-            continue
-        new_resource = collect_in_time(t, robots, resources)
-        new_resource = use_resources(o, costs, new_resource)
-        new_robots = copy.deepcopy(robots)
-        new_robots[o] += 1
-        m, DP = most_geodes(costs, new_robots, time - t, new_resource, DP)
-        most = max(most, m)
+    max_geodes = 0
+    can_build_geo = False
+    if inventory[ORE] >= costs[GEO_ORE] and inventory[OBSIDIAN] >= costs[GEO_OB]:
+        n_inv = get_inventory(costs, inventory, robots, (-costs[GEO_ORE], 0, -costs[GEO_OB], 0))
+        n_robs = (robots[ORE], robots[CLAY], robots[OBSIDIAN], robots[GEODE] + 1)
+        geodes = most_geodes(costs, time - 1, n_inv, n_robs)
+        max_geodes = max(max_geodes, geodes)
+        can_build_geo = True
+    if inventory[ORE] >= costs[ORE] and robots[ORE] < max(costs[ORE], costs[CLAY], costs[OB_ORE], costs[GEO_ORE]) \
+            and not can_build_geo:
+        n_inv = get_inventory(costs, inventory, robots, (-costs[ORE], 0, 0, 0))
+        n_robs = (robots[ORE] + 1, robots[CLAY], robots[OBSIDIAN], robots[GEODE])
+        geodes = most_geodes(costs, time - 1, n_inv, n_robs)
+        max_geodes = max(max_geodes, geodes)
+    if inventory[ORE] >= costs[CLAY] and robots[CLAY] < costs[OB_CLAY] \
+            and not can_build_geo:
+        n_inv = get_inventory(costs, inventory, robots, (-costs[CLAY], 0, 0, 0))
+        n_robs = (robots[ORE], robots[CLAY] + 1, robots[OBSIDIAN], robots[GEODE])
+        geodes = most_geodes(costs, time - 1, n_inv, n_robs)
+        max_geodes = max(max_geodes, geodes)
+    if inventory[ORE] >= costs[OB_ORE] and inventory[CLAY] >= costs[OB_CLAY] and robots[OBSIDIAN] < costs[GEO_OB] \
+            and not can_build_geo:
+        n_inv = get_inventory(costs, inventory, robots, (-costs[OB_ORE], -costs[OB_CLAY], 0, 0))
+        n_robs = (robots[ORE], robots[CLAY], robots[OBSIDIAN] + 1, robots[GEODE])
+        geodes = most_geodes(costs, time - 1, n_inv, n_robs)
+        max_geodes = max(max_geodes, geodes)
 
-    dp = (to_index(resources, robots, time), most)
-    DP.append(dp)
-    return most, DP
+    if not can_build_geo:
+        # Just waiting
+        n_inv = get_inventory(costs, inventory, robots, (0, 0, 0, 0))
+        geodes = most_geodes(costs, time - 1, n_inv, robots)
+        max_geodes = max(max_geodes, geodes)
+
+    return max_geodes
+
+# Names for easy indexing
+ORE = 0
+CLAY = 1
+OBSIDIAN = 2
+GEODE = 3
+OB_ORE = 2  # Cost
+OB_CLAY = 3  # Cost
+GEO_ORE = 4  # Cost
+GEO_OB = 5  # Cost
 
 
 def solve(d):
     stats(d)
     print("Input: ", repr(d))
     t = 0
-    t2 = 0
+    t2 = 1
 
     ll = lines(d)
     i = 1
-
     for l in ll:
-        a, b, c, d, e, f = [int(i) for i in l.split() if i.isdigit()]
-        costs = {"o": a, "c": b, "ob_o": c, "ob_c": d, "g_o": e, "g_ob": f}
-        result = most_geodes(costs, {"o": 1, "ob": 0, "c": 0, "g": 0}, 24, {"o": 0, "ob": 0, "c": 0, "g": 0}, [])
-
-        t += i * result
+        ore_cost, clay_cost, obsidian_cost_ore, obsidian_cost_clay, geode_cost_ore, geode_cost_obsidian = \
+            [int(i) for i in l.split() if i.isdigit()]
+        costs = (ore_cost, clay_cost, obsidian_cost_ore, obsidian_cost_clay, geode_cost_ore, geode_cost_obsidian)
+        result = most_geodes(costs, 32)
+        print(i, result)
+        t2 *= result
         i += 1
+        if i >= 4:
+            break
 
     return t, t2
 
 
 def main():
     test()
-    return
     solutions = solve(inp())
     print("\n\n" + BColors.HEADER + "Solutions" + BColors.ENDC)
     for s in solutions:
         print(s)
 
-
 def test():
     s = """Blueprint 1: Each ore robot costs 4 ore. Each clay robot costs 2 ore. Each obsidian robot costs 3 ore and 14 clay. Each geode robot costs 2 ore and 7 obsidian.
 Blueprint 2: Each ore robot costs 2 ore. Each clay robot costs 3 ore. Each obsidian robot costs 3 ore and 8 clay. Each geode robot costs 3 ore and 12 obsidian."""
     a1 = 33
-    a2 = 0
+    a2 = 3472
     validate_solution(solve(s), (a1, a2))
 
 
