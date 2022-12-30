@@ -39,11 +39,14 @@ def solve(d):
 
 
 def main():
-    test()
-    solutions = solve(inp())
-    print("\n\n" + BColors.HEADER + "Solutions" + BColors.ENDC)
-    for s in solutions:
-        print(s)
+    if test():
+        test()
+        solutions = solve(inp())
+        print("\n\n" + BColors.HEADER + "Solutions" + BColors.ENDC)
+        for s in solutions:
+            print(s)
+    else:
+        print("\n\n" + BColors.FAIL + "Not All Test Successful" + BColors.ENDC)
 
 
 def test():
