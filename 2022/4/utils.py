@@ -71,7 +71,6 @@ def inp(filepath='./input.txt'):
 
 def validate_solution(my_solutions, intended_solutions):
     print(BColors.HEADER + "Validation" + BColors.ENDC)
-    all_valid = True
     for i in range(len(my_solutions)):
         print("\nSolution Nr ", i+1)
 
@@ -85,8 +84,6 @@ def validate_solution(my_solutions, intended_solutions):
             print("Actual Solution")
             print(intended_solutions[i])
             print(BColors.FAIL + str(is_valid) + BColors.ENDC)
-            all_valid = False
-    return all_valid
 
 
 class Grid:
