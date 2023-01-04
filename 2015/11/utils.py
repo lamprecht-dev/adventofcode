@@ -73,8 +73,6 @@ def validate_solution(my_solutions, intended_solutions):
     print(BColors.HEADER + "Validation" + BColors.ENDC)
     all_valid = True
     for i in range(len(my_solutions)):
-        if intended_solutions[i] is None:
-            continue
         print("\nSolution Nr ", i+1)
 
         is_valid = my_solutions[i] == intended_solutions[i]

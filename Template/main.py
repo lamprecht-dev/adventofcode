@@ -40,7 +40,6 @@ def solve(d):
 
 def main():
     if test():
-        test()
         solutions = solve(inp())
         print("\n\n" + BColors.HEADER + "Solutions" + BColors.ENDC)
         for s in solutions:
@@ -51,9 +50,9 @@ def main():
 
 def test():
     s = """"""
-    a1 = 0
-    a2 = 0
-    validate_solution(solve(s), (a1, a2))
+    a1 = None
+    a2 = None
+    return validate_solution(solve(s), (a1, a2))
 
 
 if __name__ == '__main__':
