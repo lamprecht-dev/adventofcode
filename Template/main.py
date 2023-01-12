@@ -12,28 +12,21 @@ import re
 
 from utils import *
 
-# TODO: CREATE CLASSES FOR VM, Tree, Graph etc
-
 
 def solve(d):
     stats(d)
-    # print("Input: ", repr(d))
+    print("Input: ", repr(d))
     t = 0
     t2 = 0
 
     # nums = ints(d)
 
+    # ll = lines(d)
+    # for line in ll:
+
     # ww = words(d)
     # for line in ww:
-    #     for word in line:
 
-    # for line in d.split("\n"):
-    #     for w in line.split():
-    #         print(w)
-
-    # nums = [int(x) for x in d.split("\t")]
-    # nums = [[int(x) for x in l.split("\t")] for l in d.split("\n")]
-    # for num in nums:
 
     return t, t2
 
@@ -57,6 +50,3 @@ def test():
 
 if __name__ == '__main__':
     main()
-
-
-

@@ -70,14 +70,11 @@ def inp(filepath='./input.txt'):
 
 
 def validate_solution(my_solutions, intended_solutions):
+    print(BColors.HEADER + "Validation" + BColors.ENDC)
     all_valid = True
-    printed_header = False
     for i in range(len(my_solutions)):
         if intended_solutions[i] is None:
             continue
-        if not printed_header:
-            printed_header = True
-            print(BColors.HEADER + "Validation" + BColors.ENDC)
         print("\nSolution Nr ", i+1)
 
         is_valid = my_solutions[i] == intended_solutions[i]
