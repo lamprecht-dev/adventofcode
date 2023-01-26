@@ -32,20 +32,9 @@ def solve(d):
 
 
 def main():
-    if test():
-        solutions = solve(inp())
-        print("\n\n" + BColors.HEADER + "Solutions" + BColors.ENDC)
-        for s in solutions:
-            print(s)
-    else:
-        print("\n\n" + BColors.FAIL + "Not All Test Successful" + BColors.ENDC)
-
-
-def test():
-    s = """"""
-    a1 = None
-    a2 = None
-    return validate_solution(solve(s), (a1, a2))
-
+    solutions = solve(inp())
+    print("\n\n" + BColors.HEADER + "Solutions" + BColors.ENDC)
+    for s in solutions:
+        print(s)
 
 main()

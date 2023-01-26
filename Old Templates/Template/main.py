@@ -48,4 +48,5 @@ def test():
     return validate_solution(solve(s), (a1, a2))
 
 
-main()
+if __name__ == '__main__':
+    main()

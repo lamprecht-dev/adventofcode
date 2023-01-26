@@ -1,8 +1,5 @@
 import math
-import os
 
-dirs = {'r': (1, 0), 'd': (0, 1), 'l': (-1, 0), 'u': (0, -1)}
-dirs3 = {'u': (0, -1, 0), 'd': (0, 1, 0), 'l': (-1, 0, 0), 'r': (1, 0, 0), 'b': (0, 0, -1), 'f': (0, 0, 1)}
 
 def ints(s, sep=None):
     if isinstance(s, str):
@@ -65,11 +62,9 @@ class BColors:
     UNDERLINE = '\033[4m'
 
 
-def inp(filepath=None):
-    if filepath is None:
-        filepath = os.path.join(os.path.dirname(__file__), 'input.txt')
+def inp(filepath='./input.txt'):
     with open(filepath) as f:
-        data = f.read().rstrip('\n')
+        data = f.read()
 
     return data
 
